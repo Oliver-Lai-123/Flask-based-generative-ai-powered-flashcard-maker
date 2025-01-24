@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcards</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .flashcard {
+            height: 300px;
+            margin: 20px auto;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+        }
+
+        .flashcard.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .flashcard-content {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            color: white;
+            font-size: 1.2em;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+            border-radius: 15px;
+        }
+
+        .question {
+            background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
+        }
+
+        .answer {
+            background: linear-gradient(45deg, #11998e 0%, #38ef7d 100%);
+            transform: rotateY(180deg);
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        #flip-btn {
+            background: linear-gradient(45deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            background: linear-gradient(45deg, #cccccc, #999999);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .progress {
+            margin-top: 20px;
+            color: #4a4a4a;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .return-link {
+            margin-top: 25px;
+            color: #6a11cb;
+            text-decoration: none;
+            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 20px;
+            background-color: rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .return-link:hover {
+            background-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .flashcard-content p {
+            transition: opacity 0.3s ease;
+            opacity: 0.9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .flashcard-content:hover p {
+            opacity: 1;
+        }
+
+        .flashcard:hover {
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px) rotateY(0deg);
+        }
+
+        .flashcard.flipped:hover {
+            transform: translateY(-2px) rotateY(180deg);
+        }
+
+        /* Add labels to indicate question/answer */
+        .flashcard-content::before {
+            content: 'Question';
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 0.8em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.8;
+        }
+
+        .answer::before {
+            content: 'Answer';
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="flashcard" id="flashcard">
+            <div class="flashcard-content question">
+                <p id="question-text"></p>
+            </div>
+            <div class="flashcard-content answer">
+                <p id="answer-text"></p>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="prev-btn" disabled>Previous</button>
+            <button id="flip-btn">Flip Card</button>
+            <button id="next-btn">Next</button>
+        </div>
+
+        <div class="progress">
+            Card <span id="current-card">1</span> of <span id="total-cards">0</span>
+        </div>
+
+        <a href="/" class="return-link">Return to Home</a>
+    </div>
+
+    <script>
+        // Parse the flashcards from Flask template
+        const flashcardsText = `{{ flashcards }}`;
+        const flashcards = [];
+        
+        // Parse Q&A format
+        const pairs = flashcardsText.split('\n\n');
+        pairs.forEach(pair => {
+            if (pair.trim()) {
+                const [question, answer] = pair.split('\nA: ');
+                if (question && answer) {
+                    flashcards.push({
+                        question: question.replace('Q: ', ''),
+                        answer: answer
+                    });
+                }
+            }
+        });
+
+        let currentIndex = 0;
+        let isFlipped = false;
+
+        // DOM elements
+        const flashcardElement = document.getElementById('flashcard');
+        const questionText = document.getElementById('question-text');
+        const answerText = document.getElementById('answer-text');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const flipBtn = document.getElementById('flip-btn');
+        const currentCardSpan = document.getElementById('current-card');
+        const totalCardsSpan = document.getElementById('total-cards');
+
+        // Initialize
+        function updateCard() {
+            const card = flashcards[currentIndex];
+            questionText.textContent = card.question;
+            answerText.textContent = card.answer;
+            currentCardSpan.textContent = currentIndex + 1;
+            totalCardsSpan.textContent = flashcards.length;
+            
+            // Update button states
+            prevBtn.disabled = currentIndex === 0;
+            nextBtn.disabled = currentIndex === flashcards.length - 1;
+            
+            // Reset flip state
+            isFlipped = false;
+            flashcardElement.classList.remove('flipped');
+        }
+
+        // Event listeners
+        flashcardElement.addEventListener('click', () => {
+            isFlipped = !isFlipped;
+            flashcardElement.classList.toggle('flipped');
+        });
+
+        flipBtn.addEventListener('click', () => {
+            isFlipped = !isFlipped;
+            flashcardElement.classList.toggle('flipped');
+        });
+
+        prevBtn.addEventListener('click', () => {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateCard();
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            if (currentIndex < flashcards.length - 1) {
+                currentIndex++;
+                updateCard();
+            }
+        });
+
+        // Handle keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' && currentIndex > 0) {
+                currentIndex--;
+                updateCard();
+            } else if (e.key === 'ArrowRight' && currentIndex < flashcards.length - 1) {
+                currentIndex++;
+                updateCard();
+            } else if (e.key === ' ' || e.key === 'Enter') {
+                isFlipped = !isFlipped;
+                flashcardElement.classList.toggle('flipped');
+                e.preventDefault();
+            }
+        });
+
+        // Initialize the first card
+        updateCard();
+    </script>
+</body>
+</html>
