@@ -20,8 +20,8 @@ This is a Flask-based web application that allows users to upload a PDF file, ex
 1. **Clone the Repository:**
 
    ```bash
-   git clone <repository-url>
-   cd <repository-folder>
+   git clone https://github.com/Oliver-Lai-123/Flask-based-generative-ai-powered-flashcard-maker
+   cd Flask-based-generative-ai-powered-flashcard-maker
    ```
 
 2. **Install Dependencies:**
